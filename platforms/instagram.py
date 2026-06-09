@@ -219,12 +219,16 @@ def post_now(content: str, image_url: str) -> dict:
 def get_analytics(period: str = "last_7_days") -> dict:
     if not is_available():
         return _not_available()
+
+    account_data = {}
+    insights_error = None
+
+    # Try account-level insights (requires instagram_manage_insights permission)
     try:
-        # Account insights
         ins_r = requests.get(
             f"{_GRAPH_BASE}/{_user_id()}/insights",
             params={
-                "metric": "reach,impressions,profile_views,follower_count",
+                "metric": "reach,impressions,profile_views",
                 "period": "day",
                 "access_token": _token(),
             },
@@ -233,8 +237,26 @@ def get_analytics(period: str = "last_7_days") -> dict:
         ins_r.raise_for_status()
         account_data = {item["name"]: item["values"][-1]["value"]
                         for item in ins_r.json().get("data", [])}
+    except Exception as e:
+        insights_error = str(e)
+        log.warning("Instagram account insights unavailable (may need instagram_manage_insights permission): %s", e)
 
-        # Recent posts
+    # Follower count comes from the user profile, not insights
+    try:
+        profile_r = requests.get(
+            f"{_GRAPH_BASE}/{_user_id()}",
+            params={"fields": "followers_count,media_count", "access_token": _token()},
+            timeout=10,
+        )
+        profile_r.raise_for_status()
+        profile = profile_r.json()
+        account_data["followers"] = profile.get("followers_count", "N/A")
+        account_data["total_posts"] = profile.get("media_count", "N/A")
+    except Exception as e:
+        log.warning("Instagram profile fetch failed: %s", e)
+
+    # Recent posts with engagement stats (always available)
+    try:
         posts_r = requests.get(
             f"{_GRAPH_BASE}/{_user_id()}/media",
             params={
@@ -246,22 +268,25 @@ def get_analytics(period: str = "last_7_days") -> dict:
         )
         posts_r.raise_for_status()
         posts = posts_r.json().get("data", [])
-
-        return {
-            "ok":      True,
-            "platform": PLATFORM,
-            "account":  account_data,
-            "posts":   [{
-                "id":       p["id"],
-                "caption":  (p.get("caption") or "")[:60],
-                "date":     p.get("timestamp", ""),
-                "likes":    p.get("like_count", 0),
-                "comments": p.get("comments_count", 0),
-            } for p in posts],
-        }
     except Exception as e:
-        log.error("Instagram analytics failed: %s", e, exc_info=True)
+        log.error("Instagram media fetch failed: %s", e)
         return {"ok": False, "error": str(e)}
+
+    result = {
+        "ok":      True,
+        "platform": PLATFORM,
+        "account":  account_data,
+        "posts":   [{
+            "id":       p["id"],
+            "caption":  (p.get("caption") or "")[:60],
+            "date":     p.get("timestamp", ""),
+            "likes":    p.get("like_count", 0),
+            "comments": p.get("comments_count", 0),
+        } for p in posts],
+    }
+    if insights_error:
+        result["insights_note"] = "Reach/impressions unavailable — token may need instagram_manage_insights permission."
+    return result
 
 
 # ── Comments ───────────────────────────────────────────────────────────────────
