@@ -251,7 +251,7 @@ def _tool_generate_content_plan(inputs: dict) -> str:
 
     response = _client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1500,
+        max_tokens=4096,
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -355,7 +355,7 @@ async def run_turn(
 
         with _client.messages.stream(
             model="claude-sonnet-4-6",
-            max_tokens=1500,
+            max_tokens=4096,
             system=SYSTEM_PROMPT,
             tools=TOOLS,
             messages=messages,
