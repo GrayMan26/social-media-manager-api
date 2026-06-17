@@ -48,7 +48,7 @@ TOOLS = [
             "properties": {
                 "topic": {
                     "type": "string",
-                    "description": "The topic or message for the post (e.g. 'our new PC repair service')",
+                    "description": "The topic or message for the post (e.g. 'tips for preventing caregiver burnout', 'CNA job openings', 'senior home care statistics')",
                 },
                 "platforms": {
                     "type": "array",
@@ -94,7 +94,7 @@ TOOLS = [
             "properties": {
                 "focus": {
                     "type": "string",
-                    "description": "Main theme or business goal for the week (e.g. 'promote PC repair services').",
+                    "description": "Main theme for the week (e.g. 'caregiver burnout awareness', 'CNA recruitment', 'home care vs assisted living').",
                 },
                 "platforms": {
                     "type": "array",
@@ -235,18 +235,21 @@ def _tool_generate_content_plan(inputs: dict) -> str:
     unavailable = [p for p in platforms if p not in available]
 
     prompt = (
-        f"Create a {days}-day social media content calendar for a small technology business "
-        f"called GrayTech Inc that provides tech support and repair services.\n\n"
+        f"Create a {days}-day social media content calendar for GrayTech Inc., "
+        f"a senior caregiving resource account that supports family caregivers, CNAs, "
+        f"and families caring for aging loved ones.\n\n"
         f"Weekly focus: {focus}\n"
         f"Platforms: {', '.join(available) if available else 'Instagram'}\n\n"
         f"For each day, provide:\n"
         f"- Day and date offset (Day 1, Day 2, etc.)\n"
         f"- Platform(s)\n"
+        f"- Post type (news/awareness, caregiver tip, or community/recruitment)\n"
         f"- Post topic/angle\n"
         f"- Brief content idea (1-2 sentences)\n"
         f"- Best time to post\n\n"
-        f"Keep the tone professional but friendly. Focus on helpful tech tips, "
-        f"service highlights, and community engagement. Format as a clear table or list."
+        f"Vary the post types across the week. Keep the tone warm and informative. "
+        f"Focus on senior care news, practical caregiving tips, and caregiver appreciation. "
+        f"Format as a clear table or list."
     )
 
     response = _client.messages.create(
@@ -302,20 +305,26 @@ def _tool_send_reply(inputs: dict) -> str:
 
 # ── Main agent runner ──────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are the Social Media Manager for GrayTech Inc, a small technology
-business that provides tech support, PC repair, and IT services.
+SYSTEM_PROMPT = """You are the Social Media Manager for GrayTech Inc., a senior caregiving
+resource account that supports family caregivers, professional CNAs, home care workers,
+and families caring for aging loved ones.
 
 Your job is to help manage social media presence across Instagram, Facebook, Twitter/X,
-LinkedIn, and TikTok. You:
+LinkedIn, and TikTok. You post three types of content:
+1. Senior care news and awareness — policy changes, statistics, healthcare developments
+2. Daily tips for family caregivers — practical advice on home care, dementia, burnout
+3. Caregiver community posts — job opportunities for CNAs, caregiver appreciation
+
+You:
 - Create posts when asked, always showing a preview for approval before posting
 - Check analytics and summarize performance in plain English
-- Generate weekly content plans
-- Help draft replies to comments
+- Generate weekly content plans focused on senior caregiving
+- Help draft replies to comments from caregivers and families
 
 Currently available platforms: Instagram (others coming soon).
 
-Always be professional, friendly, and clear. Avoid jargon. When a platform is not
-yet configured, let the user know and focus on what IS available.
+Always be warm, informative, and clear. Speak directly to caregivers and families.
+When a platform is not yet configured, let the user know and focus on what IS available.
 
 When you call draft_post, the user will see a preview card and can approve or reject it
 before anything is posted — so always go ahead and create the draft."""

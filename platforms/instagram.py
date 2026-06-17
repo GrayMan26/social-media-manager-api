@@ -36,12 +36,12 @@ def _not_available():
 
 # ── Image: fetch from Pixabay + upload to imgbb ───────────────────────────────
 
-_TECH_FALLBACKS = [
-    "computer repair technician",
-    "laptop computer technology",
-    "small business computer",
-    "cybersecurity protection",
-    "network router wifi",
+_CARE_FALLBACKS = [
+    "senior elderly caregiver",
+    "home care elderly person",
+    "family caregiver aging parent",
+    "nurse CNA elderly patient",
+    "senior living assisted care",
 ]
 
 _FILLER = re.compile(
@@ -50,19 +50,23 @@ _FILLER = re.compile(
     re.IGNORECASE,
 )
 
+_CARE_SIGNALS = {
+    "senior","elder","elderly","care","caregiver","caregiving","aging","aged",
+    "home","nurse","nursing","cna","family","health","hospice","dementia",
+    "alzheimer","assist","support","retire","geriatric","palliative",
+}
+
 
 def _fetch_pixabay_image(topic: str) -> dict | None:
     """Search Pixabay and return the best hit, or None."""
     if not _pixabay():
         return None
     cleaned = _FILLER.sub("", topic).strip()
-    query = " ".join(cleaned.split()[:3])
-    tech_signals = {"computer","tech","laptop","cyber","network","digital",
-                    "software","hardware","server","wifi","data","repair","pc"}
-    if not any(w.lower() in tech_signals for w in query.split()):
-        query = f"{query} computer technology"
+    query = " ".join(cleaned.split()[:4])
+    if not any(w.lower() in _CARE_SIGNALS for w in query.split()):
+        query = f"{query} senior caregiver"
 
-    for q, cat in [(query, "computer"), (query, "science"), (_TECH_FALLBACKS[0], "computer")]:
+    for q, cat in [(query, "people"), (query, "health"), (_CARE_FALLBACKS[0], "people")]:
         try:
             r = requests.get("https://pixabay.com/api/", params={
                 "key": _pixabay(), "q": q, "image_type": "photo",
@@ -123,7 +127,7 @@ def _generate_caption(topic: str, image_description: str) -> str:
     """Generate an Instagram caption using Claude."""
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
-        return f"Check out our latest update on {topic}! #GrayTech #TechSupport"
+        return f"Supporting seniors and caregivers every step of the way. {topic} #SeniorCare #CaregiverLife"
 
     brand_voice_path = os.path.join(
         os.path.dirname(__file__), "..", "..", "instagram-agent", "BRAND_VOICE.md"
@@ -133,11 +137,16 @@ def _generate_caption(topic: str, image_description: str) -> str:
         with open(brand_voice_path, encoding="utf-8") as f:
             brand_voice = f.read()
     except Exception:
-        brand_voice = "Professional, friendly, and helpful tone. Focus on making tech simple."
+        brand_voice = (
+            "Warm, informative, and emotionally resonant. "
+            "Speak to family caregivers and CNAs. "
+            "Lead with a fact or emotional hook. End with a CTA to follow for more."
+        )
 
     client = anthropic.Anthropic(api_key=api_key)
     prompt = (
-        f"You are a social media manager for GrayTech Inc, a small tech support and repair business.\n\n"
+        f"You are a social media manager for GrayTech Inc., a senior caregiving resource account "
+        f"that supports family caregivers, CNAs, and families caring for aging loved ones.\n\n"
         f"BRAND VOICE:\n{brand_voice}\n\n"
         f"Write an Instagram caption for this topic: {topic}\n"
         f"Image shows: {image_description}\n\n"
