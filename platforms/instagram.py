@@ -215,14 +215,18 @@ def _generate_caption(topic: str, image_description: str) -> str:
         f"BRAND VOICE:\n{brand_voice}\n\n"
         f"Write an Instagram caption for this topic: {topic}\n"
         f"Image shows: {image_description}\n\n"
-        f"Return ONLY the caption text with hashtags. No extra commentary."
+        f"Rules:\n"
+        f"- Do NOT use em dashes (—). Use a comma or period instead.\n"
+        f"- Return ONLY the caption text with hashtags. No extra commentary."
     )
     resp = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=400,
         messages=[{"role": "user", "content": prompt}],
     )
-    return resp.content[0].text.strip()
+    caption = resp.content[0].text.strip()
+    caption = caption.replace("—", ",").replace("–", "-")
+    return caption
 
 
 # ── Draft creation ─────────────────────────────────────────────────────────────
