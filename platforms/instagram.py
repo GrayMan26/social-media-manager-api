@@ -24,6 +24,7 @@ def _token()   -> str: return os.getenv("INSTAGRAM_ACCESS_TOKEN", "")
 def _user_id() -> str: return os.getenv("INSTAGRAM_USER_ID", "")
 def _pixabay() -> str: return os.getenv("PIXABAY_API_KEY", "")
 def _imgbb()   -> str: return os.getenv("IMGBB_API_KEY", "")
+def _pexels()  -> str: return os.getenv("PEXELS_API_KEY", "")
 
 
 def is_available() -> bool:
@@ -50,29 +51,77 @@ _FILLER = re.compile(
     re.IGNORECASE,
 )
 
-_CARE_SIGNALS = {
-    "senior","elder","elderly","care","caregiver","caregiving","aging","aged",
-    "home","nurse","nursing","cna","family","health","hospice","dementia",
-    "alzheimer","assist","support","retire","geriatric","palliative",
-}
+# Maps topic signal words → a targeted Pexels/Pixabay search query
+_TOPIC_MAP: list[tuple[tuple[str, ...], str]] = [
+    (("burnout", "stress", "tired", "exhaust", "overwhelm"),         "caregiver stress exhausted nurse support"),
+    (("dementia", "alzheimer", "memory", "cognitive", "forget"),     "elderly dementia care memory support"),
+    (("cna", "certified nursing", "aide", "nursing assistant"),      "CNA nurse aide healthcare worker"),
+    (("job", "career", "hiring", "recruit", "opportunit"),           "nurse healthcare professional caregiver"),
+    (("statistic", "research", "data", "study", "percent"),          "elderly senior health aging research"),
+    (("home care", "in-home", "inhome", "home health"),              "home health aide elderly care family"),
+    (("medication", "medicine", "pill", "prescription"),             "nurse senior medication assistance"),
+    (("hospice", "palliative", "end of life"),                       "hospice palliative care comfort elderly"),
+    (("grief", "loss", "mourn"),                                     "caregiver grief support elderly comfort"),
+    (("tip", "advice", "guide", "how to"),                           "caregiver elderly practical help"),
+    (("news", "policy", "law", "legislation", "update"),             "senior healthcare elderly nursing policy"),
+    (("emotion", "support", "encourage", "community", "appreciat"),  "caregiver family support hug elderly"),
+    (("facility", "assisted living", "nursing home", "memory care"), "assisted living nursing home elderly"),
+    (("nutrition", "food", "diet", "meal"),                         "senior nutrition healthy meal elderly"),
+    (("fall", "mobility", "exercise", "physical", "walk"),           "senior mobility exercise walking elderly"),
+    (("family", "daughter", "son", "relative"),                      "family caregiver elderly parent home"),
+]
+
+
+def _build_care_query(topic: str) -> str:
+    """Map topic text to a targeted caregiving search query."""
+    topic_lower = topic.lower()
+    for signals, query in _TOPIC_MAP:
+        if any(s in topic_lower for s in signals):
+            return query
+    cleaned = _FILLER.sub("", topic).strip()
+    words = cleaned.split()[:3]
+    return " ".join(words) + " senior caregiver elderly"
+
+
+def _fetch_pexels_image(topic: str) -> dict | None:
+    """Search Pexels for a landscape senior care photo. Returns hit dict or None."""
+    if not _pexels():
+        return None
+    query = _build_care_query(topic)
+    try:
+        r = requests.get(
+            "https://api.pexels.com/v1/search",
+            headers={"Authorization": _pexels()},
+            params={"query": query, "per_page": 10, "orientation": "landscape", "size": "large"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        photos = r.json().get("photos", [])
+        if photos:
+            return photos[0]
+    except Exception as e:
+        log.warning("Pexels search failed for '%s': %s", query, e)
+    return None
 
 
 def _fetch_pixabay_image(topic: str) -> dict | None:
-    """Search Pixabay and return the best hit, or None."""
+    """Search Pixabay with editors_choice filter for higher quality."""
     if not _pixabay():
         return None
-    cleaned = _FILLER.sub("", topic).strip()
-    query = " ".join(cleaned.split()[:4])
-    if not any(w.lower() in _CARE_SIGNALS for w in query.split()):
-        query = f"{query} senior caregiver"
-
-    for q, cat in [(query, "people"), (query, "health"), (_CARE_FALLBACKS[0], "people")]:
+    query = _build_care_query(topic)
+    for q, cat, editors in [
+        (query,               "people", "true"),
+        (query,               "people", "false"),
+        (query,               "health", "false"),
+        (_CARE_FALLBACKS[0],  "people", "false"),
+    ]:
         try:
             r = requests.get("https://pixabay.com/api/", params={
                 "key": _pixabay(), "q": q, "image_type": "photo",
                 "orientation": "horizontal", "category": cat,
                 "min_width": 1080, "min_height": 1080,
-                "safesearch": "true", "per_page": 5, "order": "popular",
+                "safesearch": "true", "per_page": 10, "order": "popular",
+                "editors_choice": editors,
             }, timeout=10)
             r.raise_for_status()
             hits = r.json().get("hits", [])
@@ -102,14 +151,30 @@ def _upload_to_imgbb(image_url: str) -> str:
 
 
 def _get_public_image_url(topic: str) -> tuple[str, str]:
-    """Returns (public_cdn_url, description). Falls back gracefully."""
-    hit = _fetch_pixabay_image(topic)
-    if not hit:
+    """
+    Returns (public_cdn_url, description). Tries Pexels first, then Pixabay.
+    Uploads via imgbb so Instagram's API can fetch a stable CDN URL.
+    """
+    # Try Pexels first — better senior care photo library
+    pexels_hit = _fetch_pexels_image(topic)
+    if pexels_hit:
+        raw_url = pexels_hit["src"].get("large2x") or pexels_hit["src"].get("large", "")
+        description = f"{pexels_hit.get('alt', topic)} (Photo by {pexels_hit.get('photographer', 'Pexels')})"
+        if raw_url:
+            try:
+                cdn_url = _upload_to_imgbb(raw_url)
+                return cdn_url, description
+            except Exception as e:
+                log.warning("imgbb upload failed for Pexels image: %s — using direct URL", e)
+                return raw_url, description
+
+    # Fallback to Pixabay
+    pixabay_hit = _fetch_pixabay_image(topic)
+    if not pixabay_hit:
         return "", topic
 
-    raw_url = hit.get("largeImageURL") or hit.get("webformatURL", "")
-    description = f"{hit.get('tags', topic)}"
-
+    raw_url = pixabay_hit.get("largeImageURL") or pixabay_hit.get("webformatURL", "")
+    description = f"{pixabay_hit.get('tags', topic)}"
     if not raw_url:
         return "", description
 
@@ -117,7 +182,7 @@ def _get_public_image_url(topic: str) -> tuple[str, str]:
         cdn_url = _upload_to_imgbb(raw_url)
         return cdn_url, description
     except Exception as e:
-        log.warning("imgbb upload failed: %s — using direct URL", e)
+        log.warning("imgbb upload failed for Pixabay image: %s — using direct URL", e)
         return raw_url, description
 
 
