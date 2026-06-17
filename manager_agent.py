@@ -12,7 +12,6 @@ event when a post is ready for review.
 import json
 import logging
 import os
-from typing import AsyncGenerator
 
 import anthropic
 
@@ -21,7 +20,8 @@ from platforms import instagram, facebook, twitter, linkedin, tiktok
 
 log = logging.getLogger(__name__)
 
-_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+_client       = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+_async_client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
 # Registry of platform modules — add new ones here when they're built
 PLATFORMS = {
@@ -362,28 +362,23 @@ async def run_turn(
         tool_calls = []
         current_text = ""
 
-        with _client.messages.stream(
+        async with _async_client.messages.stream(
             model="claude-sonnet-4-6",
             max_tokens=4096,
             system=SYSTEM_PROMPT,
             tools=TOOLS,
             messages=messages,
         ) as stream:
-            for event in stream:
+            async for event in stream:
                 if event.type == "content_block_delta":
                     if hasattr(event.delta, "text"):
                         chunk = event.delta.text
                         current_text += chunk
                         full_response += chunk
                         await send_token(chunk)
-                    elif hasattr(event.delta, "partial_json"):
-                        # Tool input accumulating — no need to stream this
-                        pass
-                elif event.type == "content_block_stop":
-                    pass
 
             # Get the complete message after streaming
-            final_message = stream.get_final_message()
+            final_message = await stream.get_final_message()
 
         # Check if Claude wants to call tools
         tool_use_blocks = [b for b in final_message.content if b.type == "tool_use"]
