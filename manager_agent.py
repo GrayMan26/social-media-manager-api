@@ -42,6 +42,7 @@ TOOLS = [
             "Generate a social media post draft for one or more platforms on a given topic. "
             "Instagram posts a photo with a caption. TikTok posts either a short-form video "
             "(preferred, sourced automatically) or a photo carousel, with a TikTok-style caption. "
+            "Twitter/X posts a short text caption (280 character limit) with an image. "
             "The draft will be shown to the user for approval before anything is posted. "
             "Use this whenever the user asks to create, write, or post content."
         ),
@@ -324,8 +325,9 @@ You:
 - Generate weekly content plans focused on senior caregiving
 - Help draft replies to comments from caregivers and families
 
-Currently available platforms: Instagram, TikTok (Facebook, Twitter, LinkedIn coming soon).
+Currently available platforms: Instagram, TikTok, Twitter/X (Facebook, LinkedIn coming soon).
 TikTok posts are short-form video when a suitable clip is found, otherwise a photo carousel.
+Twitter/X posts are short text (280 character limit) with an image.
 
 Always be warm, informative, and clear. Speak directly to caregivers and families.
 When a platform is not yet configured, let the user know and focus on what IS available.
