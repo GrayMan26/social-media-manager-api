@@ -40,6 +40,8 @@ TOOLS = [
         "name": "draft_post",
         "description": (
             "Generate a social media post draft for one or more platforms on a given topic. "
+            "Instagram posts a photo with a caption. TikTok posts either a short-form video "
+            "(preferred, sourced automatically) or a photo carousel, with a TikTok-style caption. "
             "The draft will be shown to the user for approval before anything is posted. "
             "Use this whenever the user asks to create, write, or post content."
         ),
@@ -191,11 +193,12 @@ def _tool_draft_post(inputs: dict, pending_approval_callback) -> str:
         )
 
         post_preview = {
-            "post_id":      post_id,
-            "platform":     platform_name,
-            "content":      draft["content"],
-            "image_url":    draft.get("image_url", ""),
-            "scheduled_at": scheduled_at or "immediately after approval",
+            "post_id":       post_id,
+            "platform":      platform_name,
+            "content":       draft["content"],
+            "image_url":     draft.get("image_url", ""),
+            "thumbnail_url": draft.get("thumbnail_url", ""),
+            "scheduled_at":  scheduled_at or "immediately after approval",
         }
         pending_approval_callback(post_preview)
         results.append(f"{platform_name}: draft ready (post_id={post_id})")
@@ -321,7 +324,8 @@ You:
 - Generate weekly content plans focused on senior caregiving
 - Help draft replies to comments from caregivers and families
 
-Currently available platforms: Instagram (others coming soon).
+Currently available platforms: Instagram, TikTok (Facebook, Twitter, LinkedIn coming soon).
+TikTok posts are short-form video when a suitable clip is found, otherwise a photo carousel.
 
 Always be warm, informative, and clear. Speak directly to caregivers and families.
 When a platform is not yet configured, let the user know and focus on what IS available.
