@@ -2,6 +2,7 @@
 Social Media Manager API
 FastAPI server with a WebSocket endpoint for the web chat UI.
 """
+import asyncio
 import json
 import logging
 import os
@@ -64,7 +65,7 @@ def status():
 # ── REST: post approval (also handled via WebSocket, but REST is easier for testing) ──
 
 @app.post("/posts/{post_id}/approve")
-def approve_post(post_id: int):
+async def approve_post(post_id: int):
     post = db.get_post(post_id)
     if not post:
         return {"ok": False, "error": "Post not found"}
@@ -74,7 +75,20 @@ def approve_post(post_id: int):
     if not post.get("scheduled_at"):
         mod = PLATFORMS.get(post["platform"])
         if mod and mod.is_available():
-            result = mod.post_now(post["content"], post.get("image_url", ""))
+            try:
+                result = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, mod.post_now, post["content"], post.get("image_url", "")
+                    ),
+                    timeout=45,
+                )
+            except asyncio.TimeoutError:
+                return {
+                    "ok": False,
+                    "error": f"Posting to {post['platform']} is taking longer than expected. "
+                             f"Check your {post['platform']} account directly before retrying — "
+                             f"it may have actually gone through.",
+                }
             if result.get("ok"):
                 db.mark_posted(post_id)
                 return {"ok": True, "posted": True, "media_id": result.get("media_id")}
@@ -147,7 +161,23 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                 if not post.get("scheduled_at"):
                     mod = PLATFORMS.get(post["platform"])
                     if mod and mod.is_available():
-                        result = mod.post_now(post["content"], post.get("image_url", ""))
+                        try:
+                            result = await asyncio.wait_for(
+                                asyncio.get_event_loop().run_in_executor(
+                                    None, mod.post_now, post["content"], post.get("image_url", "")
+                                ),
+                                timeout=45,
+                            )
+                        except asyncio.TimeoutError:
+                            await websocket.send_text(json.dumps({
+                                "type": "post_result",
+                                "post_id": post_id,
+                                "success": False,
+                                "message": f"Posting to {post['platform']} is taking longer than expected. "
+                                           f"Check your {post['platform']} account directly before retrying — "
+                                           f"it may have actually gone through.",
+                            }))
+                            continue
                         if result.get("ok"):
                             db.mark_posted(post_id)
                             msg = f"Posted to {post['platform']} successfully!"

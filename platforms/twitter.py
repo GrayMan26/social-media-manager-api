@@ -48,7 +48,7 @@ def _client() -> tweepy.Client:
 
 def _api_v1() -> tweepy.API:
     auth = tweepy.OAuth1UserHandler(_api_key(), _api_secret(), _access_token(), _access_secret())
-    return tweepy.API(auth)
+    return tweepy.API(auth, timeout=20)   # tighter than tweepy's 60s default
 
 
 # ── Caption generation (Twitter style — 280 char hard limit) ─────────────────
