@@ -150,12 +150,15 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                         result = mod.post_now(post["content"], post.get("image_url", ""))
                         if result.get("ok"):
                             db.mark_posted(post_id)
+                            msg = f"Posted to {post['platform']} successfully!"
+                            if result.get("warning"):
+                                msg += f" ({result['warning']})"
                             await websocket.send_text(json.dumps({
                                 "type": "post_result",
                                 "post_id": post_id,
                                 "platform": post["platform"],
                                 "success": True,
-                                "message": f"Posted to {post['platform']} successfully!",
+                                "message": msg,
                             }))
                         else:
                             await websocket.send_text(json.dumps({

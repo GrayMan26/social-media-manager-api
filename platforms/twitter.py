@@ -104,17 +104,30 @@ def create_draft(topic: str) -> dict:
 # ── Posting ────────────────────────────────────────────────────────────────────
 
 def post_now(content: str, image_url: str) -> dict:
-    """Publish a tweet, with an attached image if one is available."""
+    """
+    Publish a tweet, with an attached image if one is available.
+    Media upload (v1.1) is billed separately from text posting on X's API and can
+    402 if the account has no upload credits — fall back to a text-only tweet rather
+    than failing the whole post.
+    """
     if not is_available():
         return _not_available()
-    try:
-        media_ids = []
-        if image_url:
+
+    media_ids = []
+    if image_url:
+        try:
             img_bytes = requests.get(image_url, timeout=30).content
             media = _api_v1().media_upload(filename="post.jpg", file=io.BytesIO(img_bytes))
             media_ids = [media.media_id]
+        except Exception as e:
+            log.warning("Twitter media upload failed, posting text-only: %s", e)
+
+    try:
         resp = _client().create_tweet(text=content[:280], media_ids=media_ids or None)
-        return {"ok": True, "media_id": resp.data["id"]}
+        result = {"ok": True, "media_id": resp.data["id"]}
+        if image_url and not media_ids:
+            result["warning"] = "Posted without the image — media upload failed (likely needs X API credits)."
+        return result
     except Exception as e:
         log.error("Twitter post failed: %s", e, exc_info=True)
         return {"ok": False, "error": str(e)}
