@@ -42,7 +42,9 @@ TOOLS = [
             "Generate a social media post draft for one or more platforms on a given topic. "
             "Instagram posts a photo with a caption. TikTok posts either a short-form video "
             "(preferred, sourced automatically) or a photo carousel, with a TikTok-style caption. "
-            "Twitter/X posts a short text caption (280 character limit) with an image. "
+            "Twitter/X posts a short text caption (280 character limit), normally with an image, "
+            "but the image is optional for Twitter/X specifically — use include_image=false if the "
+            "user asks for a text-only tweet or if image posting isn't working. "
             "The draft will be shown to the user for approval before anything is posted. "
             "Use this whenever the user asks to create, write, or post content."
         ),
@@ -57,6 +59,10 @@ TOOLS = [
                     "type": "array",
                     "items": {"type": "string", "enum": ["instagram", "facebook", "twitter", "linkedin", "tiktok"]},
                     "description": "Which platforms to create posts for. Use all available ones if not specified.",
+                },
+                "include_image": {
+                    "type": "boolean",
+                    "description": "Only applies to Twitter/X. Whether to attach an image. Instagram and TikTok always include media regardless of this flag. Default true.",
                 },
                 "scheduled_at": {
                     "type": "string",
@@ -170,6 +176,7 @@ def _tool_draft_post(inputs: dict, pending_approval_callback) -> str:
     topic = inputs["topic"]
     platforms = inputs.get("platforms", ["instagram"])
     scheduled_at = inputs.get("scheduled_at")
+    include_image = inputs.get("include_image", True)
 
     results = []
     for platform_name in platforms:
@@ -181,7 +188,11 @@ def _tool_draft_post(inputs: dict, pending_approval_callback) -> str:
             results.append(f"{platform_name}: not configured yet")
             continue
 
-        draft = mod.create_draft(topic)
+        draft = (
+            mod.create_draft(topic, include_image=include_image)
+            if platform_name == "twitter"
+            else mod.create_draft(topic)
+        )
         if not draft.get("ok"):
             results.append(f"{platform_name}: could not generate draft — {draft.get('error')}")
             continue
@@ -327,7 +338,9 @@ You:
 
 Currently available platforms: Instagram, TikTok, Twitter/X (Facebook, LinkedIn coming soon).
 TikTok posts are short-form video when a suitable clip is found, otherwise a photo carousel.
-Twitter/X posts are short text (280 character limit) with an image.
+Twitter/X posts are short text (280 character limit), normally with an image, but the
+image is optional — if the user asks for a text-only tweet, or if image posting is failing,
+use draft_post with include_image=false rather than refusing.
 
 Always be warm, informative, and clear. Speak directly to caregivers and families.
 When a platform is not yet configured, let the user know and focus on what IS available.

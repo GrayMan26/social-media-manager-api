@@ -83,13 +83,15 @@ def _generate_tweet_caption(topic: str) -> str:
 
 # ── Draft creation ─────────────────────────────────────────────────────────────
 
-def create_draft(topic: str) -> dict:
-    """Generate a caption and find a matching image for the given topic."""
+def create_draft(topic: str, include_image: bool = True) -> dict:
+    """Generate a caption and, optionally, find a matching image for the given topic."""
     if not is_available():
         return _not_available()
     try:
         caption = _generate_tweet_caption(topic)
-        image_url, _desc = instagram._get_public_image_url(topic)
+        image_url = ""
+        if include_image:
+            image_url, _desc = instagram._get_public_image_url(topic)
         return {
             "ok":        True,
             "platform":  PLATFORM,
@@ -129,8 +131,8 @@ def post_now(content: str, image_url: str) -> dict:
             result["warning"] = "Posted without the image — media upload failed (likely needs X API credits)."
         return result
     except Exception as e:
-        log.error("Twitter post failed: %s", e, exc_info=True)
-        return {"ok": False, "error": str(e)}
+        log.error("Twitter tweet creation failed: %s", e, exc_info=True)
+        return {"ok": False, "error": f"Tweet creation failed (not the image): {e}"}
 
 
 # ── Analytics ─────────────────────────────────────────────────────────────────
