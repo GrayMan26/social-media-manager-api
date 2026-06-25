@@ -45,6 +45,8 @@ TOOLS = [
             "Twitter/X posts a short text caption (280 character limit), normally with an image, "
             "but the image is optional for Twitter/X specifically — use include_image=false if the "
             "user asks for a text-only tweet or if image posting isn't working. "
+            "Facebook posts a photo or text-only update with a longer, conversational caption — "
+            "the image is optional for Facebook too, same include_image flag. "
             "The draft will be shown to the user for approval before anything is posted. "
             "Use this whenever the user asks to create, write, or post content."
         ),
@@ -62,7 +64,7 @@ TOOLS = [
                 },
                 "include_image": {
                     "type": "boolean",
-                    "description": "Only applies to Twitter/X. Whether to attach an image. Instagram and TikTok always include media regardless of this flag. Default true.",
+                    "description": "Only applies to Twitter/X and Facebook. Whether to attach an image. Instagram and TikTok always include media regardless of this flag. Default true.",
                 },
                 "scheduled_at": {
                     "type": "string",
@@ -190,7 +192,7 @@ def _tool_draft_post(inputs: dict, pending_approval_callback) -> str:
 
         draft = (
             mod.create_draft(topic, include_image=include_image)
-            if platform_name == "twitter"
+            if platform_name in ("twitter", "facebook")
             else mod.create_draft(topic)
         )
         if not draft.get("ok"):
@@ -336,11 +338,14 @@ You:
 - Generate weekly content plans focused on senior caregiving
 - Help draft replies to comments from caregivers and families
 
-Currently available platforms: Instagram, TikTok, Twitter/X (Facebook, LinkedIn coming soon).
+Currently available platforms: Instagram, TikTok, Twitter/X, Facebook (LinkedIn coming soon).
 TikTok posts are short-form video when a suitable clip is found, otherwise a photo carousel.
 Twitter/X posts are short text (280 character limit), normally with an image, but the
 image is optional — if the user asks for a text-only tweet, or if image posting is failing,
 use draft_post with include_image=false rather than refusing.
+Facebook posts a photo or text-only update with a longer, conversational caption; the image
+is optional there too, same include_image flag. Facebook can also read and reply to comments
+directly (unlike Twitter/X, which needs a paid API tier for that).
 
 Always be warm, informative, and clear. Speak directly to caregivers and families.
 When a platform is not yet configured, let the user know and focus on what IS available.
